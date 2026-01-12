@@ -54,11 +54,6 @@ function setupEventListeners() {
     document.getElementById('downloadBtn').addEventListener('click', downloadSong);
     document.getElementById('requestPayoutBtn').addEventListener('click', requestPayout);
     document.getElementById('nextBtn').addEventListener('click', playNext);
-    
-    audioPlayer.addEventListener('timeupdate', updateProgress);
-    videoPlayer.addEventListener('timeupdate', updateProgress);
-    audioPlayer.addEventListener('ended', () => playNext());
-    videoPlayer.addEventListener('ended', () => playNext());
 }
 
 function checkAuth() {
@@ -113,7 +108,7 @@ async function handleAuth(e) {
             currentUser = data.user;
             authModal.style.display = 'none';
             updateUIForAuth();
-            alert(`Welcome ${data.user.name}!`);
+            alert(`Welcome ${data.user.name}! 🎵`);
         } else {
             alert(data.error);
         }
@@ -158,16 +153,18 @@ async function loadSongs() {
 function displaySongs(songs) {
     musicGrid.innerHTML = songs.map(song => `
         <div class="music-card" onclick="playSong(${song.id})">
-            <img src="${song.thumbnail}" alt="${song.title}">
+            <img src="${song.thumbnail}" alt="${song.title}" onerror="this.src='https://via.placeholder.com/250x200?text=Music'">
             <div class="music-card-content">
                 <h3>${song.title}</h3>
                 <p>${song.artist}</p>
                 <div class="music-card-meta">
                     <span><i class="fas fa-${song.type === 'audio' ? 'music' : 'video'}"></i> ${song.type}</span>
                     <span>${song.duration}</span>
-                    ${song.premium ? '<span class="premium-badge">PREMIUM</span>' : ''}
                 </div>
-                <span class="language-badge">${song.language.toUpperCase()}</span>
+                <div style="margin-top: 8px;">
+                    ${song.premium ? '<span class="premium-badge">PREMIUM</span>' : ''}
+                    <span class="language-badge">${song.language.toUpperCase()}</span>
+                </div>
             </div>
         </div>
     `).join('');
@@ -201,12 +198,17 @@ async function searchSongs() {
     }
 }
 
+function getYouTubeEmbedUrl(url) {
+    const videoId = url.split('v=')[1]?.split('&')[0];
+    return `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
+}
+
 function playSong(id) {
     const song = allSongs.find(s => s.id === id);
     if (!song) return;
     
     if (song.premium && (!currentUser || currentUser.subscription === 'free')) {
-        alert('This is a premium song. Please upgrade your subscription!');
+        alert('🔒 This is a premium song. Please upgrade your subscription!');
         return;
     }
     
@@ -217,20 +219,14 @@ function playSong(id) {
     document.getElementById('playerArtist').textContent = song.artist;
     document.getElementById('playerThumbnail').src = song.thumbnail;
     
-    if (song.type === 'audio') {
-        audioPlayer.src = song.audioUrl;
-        audioPlayer.style.display = 'block';
-        videoPlayer.style.display = 'none';
-        audioPlayer.play();
-    } else {
-        videoPlayer.src = song.videoUrl;
-        videoPlayer.style.display = 'block';
-        audioPlayer.style.display = 'none';
-        videoPlayer.play();
-    }
+    // Use YouTube embed for video playback
+    const embedUrl = getYouTubeEmbedUrl(song.videoUrl);
+    videoPlayer.innerHTML = `<iframe width="100%" height="400" src="${embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+    videoPlayer.style.display = 'block';
+    audioPlayer.style.display = 'none';
     
     isPlaying = true;
-    document.getElementById('playPauseBtn').innerHTML = '<i class=\"fas fa-pause\"></i>';
+    document.getElementById('playPauseBtn').innerHTML = '<i class="fas fa-pause"></i>';
     
     if (currentUser) {
         trackEarning('play', song.id);
@@ -238,25 +234,12 @@ function playSong(id) {
 }
 
 function togglePlayPause() {
-    const media = currentSong.type === 'audio' ? audioPlayer : videoPlayer;
-    
-    if (isPlaying) {
-        media.pause();
-        document.getElementById('playPauseBtn').innerHTML = '<i class=\"fas fa-play\"></i>';
-    } else {
-        media.play();
-        document.getElementById('playPauseBtn').innerHTML = '<i class=\"fas fa-pause\"></i>';
-    }
-    
-    isPlaying = !isPlaying;
+    // For YouTube embeds, we'll just show a message
+    alert('Use the YouTube player controls to play/pause');
 }
 
 function updateProgress() {
-    const media = currentSong.type === 'audio' ? audioPlayer : videoPlayer;
-    const progress = (media.currentTime / media.duration) * 100;
-    document.getElementById('progressBar').value = progress;
-    document.getElementById('currentTime').textContent = formatTime(media.currentTime);
-    document.getElementById('duration').textContent = formatTime(media.duration);
+    // Progress tracking disabled for YouTube embeds
 }
 
 function formatTime(seconds) {
@@ -291,12 +274,9 @@ async function downloadSong() {
         const data = await response.json();
         
         if (data.success) {
-            const a = document.createElement('a');
-            a.href = data.downloadUrl;
-            a.download = `${currentSong.title}.${currentSong.type === 'audio' ? 'mp3' : 'mp4'}`;
-            a.click();
-            
-            alert('Download started!');
+            // Open YouTube link in new tab
+            window.open(data.downloadUrl, '_blank');
+            alert('✅ Opening YouTube! You can download using browser extensions or YouTube Premium.');
             trackEarning('download', currentSong.id);
         }
     } catch (error) {
@@ -347,7 +327,7 @@ async function subscribeToPlan(planId) {
         const data = await response.json();
         
         if (data.success) {
-            alert(`Successfully subscribed to ${data.subscription.plan}!`);
+            alert(`🎉 Successfully subscribed to ${data.subscription.plan}!`);
             currentUser.subscription = planId;
         }
     } catch (error) {
@@ -390,7 +370,7 @@ async function requestPayout() {
     const amount = parseFloat(document.getElementById('pendingPayout').textContent.replace('₹', ''));
     
     if (amount < 100) {
-        alert('Minimum payout amount is ₹100');
+        alert('⚠️ Minimum payout amount is ₹100');
         return;
     }
     
@@ -407,7 +387,7 @@ async function requestPayout() {
         const data = await response.json();
         
         if (data.success) {
-            alert(data.message);
+            alert(`✅ ${data.message}`);
             loadEarnings();
         }
     } catch (error) {
